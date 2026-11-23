@@ -1,0 +1,8 @@
+[
+  {
+    "network": "192.0.2.0/24",
+    "lat": 0.0,
+    "lon": 0.0,
+    "label": "Example Lab Network"
+  }
+]
