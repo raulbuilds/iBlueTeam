@@ -1,81 +1,139 @@
-# iBlueTeam: Detection Coverage Matrix
 
-MITRE ATT&CK matrisi üzərində detection əhatəsini göstərən komanda platforması. Əhatə statusu əl ilə seçilmir, qaydalardan, test nəticələrindən və log mənbələrinin vəziyyətindən hesablanır.
+# iBlueTeam — Detection Coverage & Threat Visibility
 
-- **Backend:** Python, FastAPI, SQLAlchemy, SQLite (`data/ibluteam.db`)
-- **Frontend:** HTML, CSS, vanilla JS (build addımı yoxdur)
-- **Verilənlər:** ATT&CK Enterprise (MITRE-in rəsmi STIX faylı), sintetik nümunə qaydalar və test qeydləri
+**iBlueTeam** is a cybersecurity portfolio project for assessing detection coverage against the MITRE ATT&CK Enterprise framework. Rather than assigning coverage manually, it derives coverage states from detection-rule status, test results, and log-source availability.
 
-## İşə salmaq (təmiz mühit)
+The project combines a detection coverage matrix, risk-prioritized gap analysis, Sigma rule management, a simulated live monitor, and a separately deployable honeypot sensor. It is a **local prototype for demonstration and learning**, not a production-ready SIEM or intrusion-prevention system.
+
+## Technology stack
+
+- **Backend:** Python, FastAPI, SQLAlchemy, SQLite
+- **Frontend:** HTML, CSS, vanilla JavaScript (no frontend build step)
+- **Security data:** MITRE ATT&CK Enterprise STIX, sample detection rules and test records
+- **Rule formats:** Sigma YAML and CSV
+
+## Main features
+
+| Module | Capabilities |
+|---|---|
+| Coverage Matrix | ATT&CK tactics, techniques and sub-techniques; coverage states; heatmap; filters; tactic-level and overall metrics; risk-weighted coverage |
+| Overview | Coverage summaries and statistics for rules, tests and log sources |
+| Detection Rules | Create, edit and remove rules; associate log sources; record tests; import Sigma YAML and CSV |
+| Log Sources | Track telemetry availability and identify missing sources |
+| Gap Analysis | Prioritize coverage gaps, review contributing factors and export CSV |
+| Live Monitor | Visualize simulated security events and, when configured, honeypot events |
+| Honeypot | Separate sensor for recording inbound connection activity and mapping events to ATT&CK techniques |
+| Exports | Matrix JSON/CSV, gap CSV and ATT&CK Navigator layer |
+
+## Quick start
+
+**Requirements:** Python, pip, and an internet connection for downloading the full ATT&CK dataset on first run.
+
+### Windows PowerShell
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+$env:IBT_ADMIN_PASSWORD = "replace-with-a-strong-password"
+python run.py
+```
+
+### Linux / macOS
 
 ```bash
-python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-IBT_ADMIN_PASSWORD='sizin-parolunuz' python run.py     # Windows PowerShell: $env:IBT_ADMIN_PASSWORD='...'; python run.py
+export IBT_ADMIN_PASSWORD='replace-with-a-strong-password'
+python run.py
 ```
 
-Brauzerdə açın: http://127.0.0.1:8000 (giriş: `admin` və verdiyiniz parol).
+Open **http://127.0.0.1:8000** and sign in as `admin` with the password you configured. If `IBT_ADMIN_PASSWORD` is not set when the initial admin account is created, the application generates a password and prints it to the terminal once. Keep credentials private.
 
-- `IBT_ADMIN_PASSWORD` verilməsə, ilk işə salmada təsadüfi parol yaradılıb konsola bir dəfə çap olunur.
-- **MITRE ATT&CK dataset:** `data/enterprise-attack.json` is intentionally excluded from this GitHub repository because it exceeds GitHub’s 25 MB browser-upload limit. On the first launch, iBlueTeam automatically attempts to download the official MITRE ATT&CK Enterprise STIX dataset and import it into the local SQLite database. An internet connection is required for this automatic download. If the download fails, the application uses a limited built-in fallback dataset instead of the complete ATT&CK matrix.
-- **Manual setup (offline or failed download):** Download [`enterprise-attack.json`](https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json) from the official [MITRE CTI repository](https://github.com/mitre/cti), save it as `data/enterprise-attack.json`, then run `python run.py --reimport-attack` from the project root. This imports the full dataset into the local database. The dataset is excluded by `.gitignore` and should not be committed to GitHub.
-- **Note:** `--reimport-attack` forces a fresh import. If the local JSON file is absent, the application attempts to download it first; without internet access, it falls back to the limited built-in dataset.
-- Köhnə `data/ibluteam.db` faylınız varsa saxlayın: açılışda avtomatik yenilənir, məlumat itmir.
-- Eyni şəbəkədəki cihazlar (telefon, honeypot VM) üçün: `python run.py --lan` (cmd-də qoşulma ünvanları yazılır). Şəbəkədəki hər kəs baxa bilər, dəyişiklik üçün giriş lazımdır.
-- Seçimlər: `--port 9000`, `--no-sample` (nümunə qaydalar olmadan), `--reimport-attack`, `--reload`.
-- Mühit dəyişənləri: `IBT_ADMIN_PASSWORD`, `IBT_SECRET` (token açarı), `IBT_TARGET_NAME`, `IBT_TARGET_LAT`, `IBT_TARGET_LON` (monitor xəritəsində qorunan şəbəkənin yeri).
-- İnteraktiv API sənədi: http://127.0.0.1:8000/docs
+Interactive API documentation: **http://127.0.0.1:8000/docs**.
 
-## Səhifələr
+## MITRE ATT&CK dataset setup
 
-| Səhifə | Məzmun |
+The full `data/enterprise-attack.json` file is **not included** in this repository because it exceeds GitHub's 25 MB browser-upload limit.
+
+On startup, iBlueTeam attempts to download the official ATT&CK Enterprise STIX dataset and import it into the local SQLite database. If the download fails, the application can use a limited built-in fallback dataset; the full matrix will not be available.
+
+To install the full dataset manually:
+
+1. Download [`enterprise-attack.json`](https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json) from the [official MITRE CTI repository](https://github.com/mitre/cti).
+2. Save the file to `data/enterprise-attack.json` in the project directory.
+3. Run:
+
+```bash
+python run.py --reimport-attack
+```
+
+The dataset is excluded by `.gitignore`; do not commit it to the repository. If the local file is absent, the application attempts to download it before using its fallback dataset.
+
+## Coverage calculation
+
+Coverage is derived from the relationship between a technique, its detection rules, the latest test results and the availability of associated log sources.
+
+| State | Interpretation |
 |---|---|
-| **Matris** | Taktikalar üzrə sütunlar, status rəngləri, **heatmap rejimi**, taktika və ümumi əhatə faizi, risk-çəkili əhatə, kor texnikalar, axtarış və filtr (taktika adı, status, platforma), alt-texnikalar |
-| **Monitor** | **Live Detection Monitor**: dünya xəritəsində sintetik hadisə axını (aşkarlandı, qismən, qaçırıldı), canlı axın siyahısı, ən təhlükəli boşluqlar |
-| **Honeypot** | Açıq portlara gələn real skan və hücumlar: statistika, sensor açarı, simulyasiya, quraşdırma əmri, hadisə cədvəli. Hadisələr ATT&CK texnikalarına uyğunlaşdırılır, Monitor-da «Honeypot» rejimində, matrisdə və boşluq balında görünür. Ətraflı: [docs/honeypot.md](docs/honeypot.md) |
-| **Qaydalar** | Qayda siyahısı, əlavə, redaktə, silmə, log mənbəyi bağlama, **test qeydləri**, Sigma YAML və CSV idxalı |
-| **Mənbələr** | Log mənbəyi kataloqu: hansı mənbə toplanır. Toplanmayan mənbə qaydanı «kor» edir |
-| **Boşluqlar** | Prioritet balına görə sıralanmış boşluqlar, səbəb, filtrlər, CSV ixracı |
-| **İcmal** | Ümumi faiz, taktika üzrə əhatə, qayda, test və log mənbəyi statistikası |
+| Full | At least one enabled rule has a successful latest test and all associated log sources are collected |
+| Partial | A rule exists, but is in draft, untested, has a failed latest test or lacks specified log sources |
+| Gap | No suitable active rule exists, or required telemetry is unavailable |
+| Blind | A gap specifically associated with missing telemetry |
 
-Texnikaya klik edəndə yan panel açılır: təsvir, lazım olan log mənbələri, bağlı qaydalar, test qeydləri, alt-texnikalar, qeydlər.
+For implementation details, see [docs/coverage.md](docs/coverage.md).
 
-**Giriş:** oxumaq üçün giriş lazım deyil. Qayda, test, qeyd, log mənbəyi və idxal dəyişiklikləri yalnız daxil olmuş istifadəçi üçündür. Admin istifadəçi əlavə edə bilər (topbar → istifadəçi menyusu).
+## Deployment and configuration
 
-**İxrac:** topbar-da «İxrac» menyusu: Matris JSON, Matris CSV, Boşluqlar CSV, ATT&CK Navigator layer.
+Useful startup options:
 
-## Əhatə necə hesablanır
-
-Qısa xülasə (tam sənəd: [docs/coverage.md](docs/coverage.md)):
-
-| Vəziyyət | Şərt |
-|---|---|
-| Tam | ən azı bir qayda **aktivdir, son testi uğurludur və bütün log mənbələri toplanır** |
-| Qismən | qayda var, amma draft, test olunmamış, son test uğursuz və ya log mənbəyi göstərilməyib |
-| Boşluq | qayda yoxdur, söndürülüb və ya log mənbəyi toplanmır |
-| Kor | boşluq və səbəb telemetriyadır (qayda var, amma mənbə toplanmır, ya da ATT&CK-ın tələb etdiyi mənbələrin heç biri toplanmır) |
-
-## Sənədlər
-
-- [docs/architecture.md](docs/architecture.md): arxitektur sxemi, məlumat axını, təhlükəsizlik
-- [docs/data-model.md](docs/data-model.md): data modeli və API xülasəsi
-- [docs/coverage.md](docs/coverage.md): coverage hesablama qaydası, heatmap balı, boşluq balı
-- [docs/honeypot.md](docs/honeypot.md): honeypot quraşdırması, təsnifat, təhlükəsizlik
-- [docs/demo.md](docs/demo.md): demo ssenarisi
-
-## Qovluq quruluşu
-
-```
-honeypot/  honeypot.py (sensor agenti), sim_client.py (sınaq trafiki)
-backend/   main.py (API), honeypot.py, geo.py, models.py, coverage.py, auth.py, monitor.py, attack_import.py, sigma.py, seed*.py
-frontend/  index.html, css/style.css, js/ (matrix, monitor, honeypot, rules, sources, gaps, overview, panel, auth)
-data/      ATT&CK JSON, nümunə qaydalar. SQLite faylı və gizli açar işə salınanda yaranır (repoya düşmür)
-docs/      arxitektur, data modeli, coverage qaydası, demo
+```bash
+python run.py --port 9000
+python run.py --no-sample
+python run.py --reimport-attack
+python run.py --reload
+python run.py --lan
 ```
 
-## Məhdudiyyətlər
+`--lan` binds the server to network interfaces so other devices on the same network can reach it. **Use this only on a trusted, controlled network.** Do not expose this prototype directly to the public internet.
 
-- SIEM inteqrasiyası yoxdur. Honeypot real trafik üçün açıq IP-li ayrıca VM tələb edir (platformadan kənarda qurulur). Qaydalar və log mənbəyi vəziyyəti əl ilə və ya fayl ilə daxil edilir. Monitor sintetik hadisələrlə işləyir.
-- Qaydalar platformaya bağlı deyil: qayda texnikaya bağlanır, texnika bir neçə platformada varsa, əhatə bu platformaların hamısında sayılır.
-- SQLite az sayda eyni vaxtlı istifadəçi üçün kifayətdir. PostgreSQL-ə keçid `backend/database.py`-dakı bağlantı sətrini dəyişməklə olur.
-- Şriftlər Google Fonts-dan yüklənir. İnternet yoxdursa, sistem şrifti istifadə olunur.
+Supported environment variables include `IBT_ADMIN_PASSWORD`, `IBT_SECRET`, `IBT_TARGET_NAME`, `IBT_TARGET_LAT` and `IBT_TARGET_LON`.
+
+For optional lab-network mapping, edit the example configuration described in [data/LAB_LOCATIONS_SETUP.md](data/LAB_LOCATIONS_SETUP.md). Replace sample addresses and coordinates with values appropriate for your own lab. Never commit real credentials, private keys, secrets or sensitive infrastructure details.
+
+## Project structure
+
+```text
+backend/       FastAPI endpoints, models, authentication, coverage logic, ATT&CK import
+frontend/      HTML, CSS and JavaScript application
+honeypot/      Sensor and traffic simulation utilities
+data/          Sample rules and example configuration
+docs/          Architecture, data model, coverage, honeypot and demo documentation
+run.py         Application entry point
+requirements.txt
+README.md
+```
+
+## Documentation
+
+- [Architecture and security](docs/architecture.md)
+- [Data model and API overview](docs/data-model.md)
+- [Coverage methodology](docs/coverage.md)
+- [Honeypot setup and event handling](docs/honeypot.md)
+- [Demo walkthrough](docs/demo.md)
+- [Lab location configuration](data/LAB_LOCATIONS_SETUP.md)
+
+## Security and limitations
+
+- This is an educational and portfolio prototype; it has not been independently production-hardened.
+- The live monitor includes **synthetic events**. These are demonstrations, not evidence of actual attacks.
+- The honeypot sensor requires a separately configured environment. Incoming connections and scans are not automatically proof of malicious intent.
+- There is no direct SIEM integration in this version. Rule and log-source information is entered through the application or imported from files.
+- Coverage associations are technique-based and may not distinguish every platform-specific detection scenario.
+- SQLite is intended for a small local deployment, not a large concurrent production workload.
+- Google Fonts may require an internet connection; the interface can fall back to system fonts.
+
+## Project purpose
+
+Built to explore **blue-team workflows, detection engineering, ATT&CK mapping, telemetry visibility and practical cybersecurity application development**.
