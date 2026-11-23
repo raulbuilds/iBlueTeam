@@ -269,7 +269,7 @@ IP geolocation is approximate and does not establish the physical location or id
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/r4ul70/iBlueTeam.git
+git clone https://github.com/raulbuilds/iBlueTeam.git
 cd iBlueTeam
 ```
 
